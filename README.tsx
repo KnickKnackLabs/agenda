@@ -54,7 +54,8 @@ agenda calendar list
 agenda calendar create --name agent/k7r2
 agenda calendar list --json
 agenda event list --days 14 --limit 20
-agenda event list --calendar Work --json`}</CodeBlock>
+agenda event create --calendar agent/k7r2 --title "Agenda follow-up" --start "2026-05-08 10:00"
+agenda event list --calendar agent/k7r2 --json`}</CodeBlock>
     </Section>
 
     <Section title="Commands">
@@ -64,6 +65,7 @@ agenda event list --calendar Work --json`}</CodeBlock>
         <Item><Code>calendar list</Code> — list readable calendars, sources, types, and writability.</Item>
         <Item><Code>calendar create</Code> — create a writable calendar if it does not already exist.</Item>
         <Item><Code>event list</Code> — list events from now through a configurable day window.</Item>
+        <Item><Code>event create</Code> — create an event on a writable calendar.</Item>
       </List>
     </Section>
 
@@ -101,6 +103,7 @@ agenda event list --days 7`}</CodeBlock>
       <CodeBlock lang="bash">{`agenda status --json
 agenda calendar list --json
 agenda calendar create --name agent/k7r2 --json
+agenda event create --calendar agent/k7r2 --title "Agenda follow-up" --start "2026-05-08 10:00" --json
 agenda event list --days 3 --limit 10 --json`}</CodeBlock>
     </Section>
 

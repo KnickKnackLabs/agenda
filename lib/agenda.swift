@@ -13,6 +13,12 @@ struct Options {
     var calendar: String?
     var name: String?
     var source: String?
+    var title: String?
+    var start: String?
+    var end: String?
+    var duration = 30
+    var location: String?
+    var notes: String?
 }
 
 do {
@@ -54,6 +60,20 @@ func run(_ args: [String]) throws {
     case "event/list":
         let options = try parseOptions(rest, allowDays: true, allowLimit: true, allowCalendar: true)
         try listUpcoming(options: options)
+    case "event/create":
+        let options = try parseOptions(
+            rest,
+            allowDays: false,
+            allowLimit: false,
+            allowCalendar: true,
+            allowTitle: true,
+            allowStart: true,
+            allowEnd: true,
+            allowDuration: true,
+            allowLocation: true,
+            allowNotes: true
+        )
+        try createEvent(options: options)
     default:
         throw AgendaError(description: "unknown command '\(command)'\nRun 'agenda --help' for usage.")
     }
@@ -65,7 +85,13 @@ func parseOptions(
     allowLimit: Bool,
     allowCalendar: Bool,
     allowName: Bool = false,
-    allowSource: Bool = false
+    allowSource: Bool = false,
+    allowTitle: Bool = false,
+    allowStart: Bool = false,
+    allowEnd: Bool = false,
+    allowDuration: Bool = false,
+    allowLocation: Bool = false,
+    allowNotes: Bool = false
 ) throws -> Options {
     var options = Options()
     var index = 0
@@ -115,6 +141,38 @@ func parseOptions(
             guard allowSource else { throw AgendaError(description: "--source is not valid for this command") }
             options.source = try requireValue(after: arg)
             index += 1
+        case "--title":
+            guard allowTitle else { throw AgendaError(description: "--title is not valid for this command") }
+            let value = try requireValue(after: arg)
+            guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw AgendaError(description: "--title must not be empty")
+            }
+            options.title = value
+            index += 1
+        case "--start":
+            guard allowStart else { throw AgendaError(description: "--start is not valid for this command") }
+            options.start = try requireValue(after: arg)
+            index += 1
+        case "--end":
+            guard allowEnd else { throw AgendaError(description: "--end is not valid for this command") }
+            options.end = try requireValue(after: arg)
+            index += 1
+        case "--duration":
+            guard allowDuration else { throw AgendaError(description: "--duration is not valid for this command") }
+            let value = try requireValue(after: arg)
+            guard let duration = Int(value), duration > 0 else {
+                throw AgendaError(description: "--duration must be a positive integer")
+            }
+            options.duration = duration
+            index += 1
+        case "--location":
+            guard allowLocation else { throw AgendaError(description: "--location is not valid for this command") }
+            options.location = try requireValue(after: arg)
+            index += 1
+        case "--notes":
+            guard allowNotes else { throw AgendaError(description: "--notes is not valid for this command") }
+            options.notes = try requireValue(after: arg)
+            index += 1
         default:
             if arg.hasPrefix("-") {
                 throw AgendaError(description: "unknown flag '\(arg)'")
@@ -137,6 +195,7 @@ func printUsage() {
       agenda calendar list [--json]
       agenda calendar create --name NAME [--source SOURCE] [--json]
       agenda event list [--days N] [--limit N] [--calendar NAME_OR_ID] [--json]
+      agenda event create --calendar CAL --title TITLE --start START [--end END] [--duration MIN] [--json]
 
     Commands:
       status           Show Calendar permission status without prompting
@@ -144,6 +203,7 @@ func printUsage() {
       calendar list    List readable calendars
       calendar create  Create a calendar if it does not already exist
       event list       List upcoming events
+      event create     Create an event on a writable calendar
 
     Notes:
       Only request-access triggers the macOS permission prompt.
@@ -291,6 +351,54 @@ func createCalendar(options: Options) throws {
     }
 }
 
+func createEvent(options: Options) throws {
+    try requireWriteAccess()
+
+    guard let calendarFilter = options.calendar else {
+        throw AgendaError(description: "--calendar is required")
+    }
+    guard let title = options.title else {
+        throw AgendaError(description: "--title is required")
+    }
+    guard let startText = options.start else {
+        throw AgendaError(description: "--start is required")
+    }
+
+    let store = EKEventStore()
+    let calendar = try findCalendar(store: store, filter: calendarFilter)
+    guard calendar.allowsContentModifications else {
+        throw AgendaError(description: "calendar '\(calendar.title)' is not writable")
+    }
+
+    let start = try parseDate(startText)
+    let end: Date
+    if let endText = options.end {
+        end = try parseDate(endText)
+    } else {
+        end = start.addingTimeInterval(TimeInterval(options.duration * 60))
+    }
+    guard end > start else {
+        throw AgendaError(description: "event end must be after start")
+    }
+
+    let event = EKEvent(eventStore: store)
+    event.calendar = calendar
+    event.title = title
+    event.startDate = start
+    event.endDate = end
+    event.location = options.location
+    event.notes = options.notes ?? "Created by agenda."
+
+    try store.save(event, span: .thisEvent, commit: true)
+
+    let payload = eventPayload(event)
+    if options.json {
+        try printJSON(payload)
+    } else {
+        printTable(headers: ["KEY", "VALUE"], rows: eventCreateRows(payload))
+    }
+}
+
 func listUpcoming(options: Options) throws {
     try requireReadAccess()
 
@@ -298,12 +406,7 @@ func listUpcoming(options: Options) throws {
     var calendars = store.calendars(for: .event)
 
     if let filter = options.calendar {
-        calendars = calendars.filter { calendar in
-            calendar.calendarIdentifier == filter || calendar.title == filter
-        }
-        if calendars.isEmpty {
-            throw AgendaError(description: "no calendar matched '\(filter)'")
-        }
+        calendars = [try findCalendar(store: store, filter: filter)]
     }
 
     let now = Date()
@@ -378,6 +481,15 @@ func canWriteEvents(_ status: EKAuthorizationStatus) -> Bool {
     }
 }
 
+func findCalendar(store: EKEventStore, filter: String) throws -> EKCalendar {
+    if let calendar = store.calendars(for: .event).first(where: {
+        $0.calendarIdentifier == filter || $0.title == filter
+    }) {
+        return calendar
+    }
+    throw AgendaError(description: "no calendar matched '\(filter)'")
+}
+
 func selectSource(store: EKEventStore, requested: String?) throws -> EKSource {
     if let requested = requested {
         if let source = store.sources.first(where: { $0.sourceIdentifier == requested || $0.title == requested }) {
@@ -424,6 +536,16 @@ func calendarCreateRows(_ payload: [String: String]) -> [[String]] {
     ]
 }
 
+func eventCreateRows(_ payload: [String: String]) -> [[String]] {
+    [
+        ["Title", payload["title"] ?? ""],
+        ["Start", payload["start"] ?? ""],
+        ["End", payload["end"] ?? ""],
+        ["Calendar", payload["calendar"] ?? ""],
+        ["ID", payload["id"] ?? ""],
+    ]
+}
+
 func eventPayload(_ event: EKEvent) -> [String: String] {
     [
         "id": event.eventIdentifier ?? "",
@@ -448,6 +570,30 @@ func calendarTypeName(_ type: EKCalendarType) -> String {
     case .birthday: return "birthday"
     @unknown default: return "unknown(\(type.rawValue))"
     }
+}
+
+func parseDate(_ text: String) throws -> Date {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    let iso = ISO8601DateFormatter()
+    iso.formatOptions = [.withInternetDateTime, .withTimeZone]
+    if let date = iso.date(from: trimmed) {
+        return date
+    }
+
+    let formats = ["yyyy-MM-dd HH:mm", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm"]
+    for format in formats {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = format
+        if let date = formatter.date(from: trimmed) {
+            return date
+        }
+    }
+
+    throw AgendaError(description: "could not parse date '\(text)' (use YYYY-MM-DD HH:MM or ISO-8601)")
 }
 
 func formatDate(_ date: Date?, allDay: Bool) -> String {

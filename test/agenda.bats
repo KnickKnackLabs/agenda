@@ -30,6 +30,26 @@ EXPECTED
 ) "$AGENDA_FAKE_SWIFT_LOG"
 }
 
+@test "event create task forwards event fields" {
+  run agenda event:create --calendar agent/k7r2 --title "Agenda follow-up" --start "2026-05-08 10:00" --duration 30 --json
+
+  [ "$status" -eq 0 ]
+  diff -u <(cat <<EXPECTED
+$REPO_DIR/lib/agenda.swift
+event/create
+--calendar
+agent/k7r2
+--title
+Agenda follow-up
+--start
+2026-05-08 10:00
+--duration
+30
+--json
+EXPECTED
+) "$AGENDA_FAKE_SWIFT_LOG"
+}
+
 @test "event list task forwards flags" {
   run agenda event:list --days 2 --limit 3 --json
 

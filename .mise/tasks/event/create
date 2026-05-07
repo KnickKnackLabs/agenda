@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+#MISE description="Create an event on a writable calendar"
+#USAGE flag "--calendar <calendar>" required=#true help="Calendar title or identifier"
+#USAGE flag "--title <title>" required=#true help="Event title"
+#USAGE flag "--start <start>" required=#true help="Start time: YYYY-MM-DD HH:MM or ISO-8601"
+#USAGE flag "--end <end>" help="End time: YYYY-MM-DD HH:MM or ISO-8601"
+#USAGE flag "--duration <minutes>" help="Duration in minutes when --end is omitted (default: 30)"
+#USAGE flag "--location <location>" help="Event location"
+#USAGE flag "--notes <notes>" help="Event notes"
+#USAGE flag "--json" help="Output JSON"
+set -euo pipefail
+
+exec "${SWIFT:-swift}" "$MISE_CONFIG_ROOT/lib/agenda.swift" "event/create" "$@"
