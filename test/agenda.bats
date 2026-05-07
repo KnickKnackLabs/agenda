@@ -7,34 +7,7 @@ setup() {
   make_fake_swift
 }
 
-@test "agenda task dispatches to Swift source" {
-  run agenda status
-
-  [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "Calendar access: notDetermined" ]
-  [ "$(sed -n '1p' "$AGENDA_FAKE_SWIFT_LOG")" = "$REPO_DIR/lib/agenda.swift" ]
-  [ "$(sed -n '2p' "$AGENDA_FAKE_SWIFT_LOG")" = "status" ]
-}
-
-@test "agenda task forwards command arguments" {
-  run agenda upcoming --days 14 --limit 5 --calendar Work --json
-
-  [ "$status" -eq 0 ]
-  diff -u <(cat <<EXPECTED
-$REPO_DIR/lib/agenda.swift
-upcoming
---days
-14
---limit
-5
---calendar
-Work
---json
-EXPECTED
-) "$AGENDA_FAKE_SWIFT_LOG"
-}
-
-@test "first-class status task forwards to Swift command" {
+@test "status task forwards to Swift command" {
   run agenda_task status --json
 
   [ "$status" -eq 0 ]
@@ -43,7 +16,7 @@ EXPECTED
   [ "$(sed -n '3p' "$AGENDA_FAKE_SWIFT_LOG")" = "--json" ]
 }
 
-@test "first-class upcoming task forwards flags" {
+@test "upcoming task forwards flags" {
   run agenda_task upcoming --days 2 --limit 3 --json
 
   [ "$status" -eq 0 ]

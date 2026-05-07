@@ -27,12 +27,6 @@ ensure_caller_pwd() {
   fi
 }
 
-agenda() {
-  ensure_caller_pwd
-  cd "$REPO_DIR" && SWIFT="${FAKE_SWIFT:-swift}" CALLER_PWD="$CALLER_PWD" mise run -q agenda "$@"
-}
-export -f agenda
-
 agenda_task() {
   ensure_caller_pwd
   cd "$REPO_DIR" && SWIFT="${FAKE_SWIFT:-swift}" CALLER_PWD="$CALLER_PWD" mise run -q "$@"
