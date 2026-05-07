@@ -36,10 +36,10 @@ func run(_ args: [String]) throws {
     case "request-access":
         let options = try parseOptions(rest, allowDays: false, allowLimit: false, allowCalendar: false)
         try requestAccess(json: options.json)
-    case "calendars":
+    case "calendar/list":
         let options = try parseOptions(rest, allowDays: false, allowLimit: false, allowCalendar: false)
         try listCalendars(json: options.json)
-    case "upcoming":
+    case "event/list":
         let options = try parseOptions(rest, allowDays: true, allowLimit: true, allowCalendar: true)
         try listUpcoming(options: options)
     default:
@@ -108,14 +108,14 @@ func printUsage() {
     Usage:
       agenda status [--json]
       agenda request-access [--json]
-      agenda calendars [--json]
-      agenda upcoming [--days N] [--limit N] [--calendar NAME_OR_ID] [--json]
+      agenda calendar list [--json]
+      agenda event list [--days N] [--limit N] [--calendar NAME_OR_ID] [--json]
 
     Commands:
       status          Show Calendar permission status without prompting
       request-access  Ask macOS for Calendar read access
-      calendars       List readable calendars
-      upcoming        List upcoming events
+      calendar list   List readable calendars
+      event list      List upcoming events
 
     Notes:
       Only request-access triggers the macOS permission prompt.

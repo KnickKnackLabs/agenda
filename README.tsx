@@ -50,18 +50,18 @@ const readme = (
 
       <CodeBlock lang="bash">{`agenda status
 agenda request-access
-agenda calendars
-agenda calendars --json
-agenda upcoming --days 14 --limit 20
-agenda upcoming --calendar Work --json`}</CodeBlock>
+agenda calendar list
+agenda calendar list --json
+agenda event list --days 14 --limit 20
+agenda event list --calendar Work --json`}</CodeBlock>
     </Section>
 
     <Section title="Commands">
       <List>
         <Item><Code>status</Code> — show Calendar authorization state without prompting.</Item>
         <Item><Code>request-access</Code> — ask macOS for full EventKit calendar access.</Item>
-        <Item><Code>calendars</Code> — list readable calendars, sources, types, and writability.</Item>
-        <Item><Code>upcoming</Code> — list events from now through a configurable day window.</Item>
+        <Item><Code>calendar list</Code> — list readable calendars, sources, types, and writability.</Item>
+        <Item><Code>event list</Code> — list events from now through a configurable day window.</Item>
       </List>
     </Section>
 
@@ -80,7 +80,7 @@ agenda status
 agenda request-access
 
 # Requires read access already granted
-agenda upcoming --days 7`}</CodeBlock>
+agenda event list --days 7`}</CodeBlock>
     </Section>
 
     <Section title="Output">
@@ -97,8 +97,8 @@ agenda upcoming --days 7`}</CodeBlock>
       </Paragraph>
 
       <CodeBlock lang="bash">{`agenda status --json
-agenda calendars --json
-agenda upcoming --days 3 --limit 10 --json`}</CodeBlock>
+agenda calendar list --json
+agenda event list --days 3 --limit 10 --json`}</CodeBlock>
     </Section>
 
     <Section title="Development">

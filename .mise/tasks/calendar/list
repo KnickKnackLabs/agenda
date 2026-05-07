@@ -3,4 +3,4 @@
 #USAGE flag "--json" help="Output JSON"
 set -euo pipefail
 
-exec "${SWIFT:-swift}" "$MISE_CONFIG_ROOT/lib/agenda.swift" "calendars" "$@"
+exec "${SWIFT:-swift}" "$MISE_CONFIG_ROOT/lib/agenda.swift" "calendar/list" "$@"

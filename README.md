@@ -21,18 +21,18 @@ The read commands do not trigger the macOS permission prompt. Use `agenda reques
 ```bash
 agenda status
 agenda request-access
-agenda calendars
-agenda calendars --json
-agenda upcoming --days 14 --limit 20
-agenda upcoming --calendar Work --json
+agenda calendar list
+agenda calendar list --json
+agenda event list --days 14 --limit 20
+agenda event list --calendar Work --json
 ```
 
 ## Commands
 
 - `status` — show Calendar authorization state without prompting.
 - `request-access` — ask macOS for full EventKit calendar access.
-- `calendars` — list readable calendars, sources, types, and writability.
-- `upcoming` — list events from now through a configurable day window.
+- `calendar list` — list readable calendars, sources, types, and writability.
+- `event list` — list events from now through a configurable day window.
 
 ## Permission model
 
@@ -46,7 +46,7 @@ agenda status
 agenda request-access
 
 # Requires read access already granted
-agenda upcoming --days 7
+agenda event list --days 7
 ```
 
 ## Output
@@ -59,8 +59,8 @@ Every read surface that returns structured data accepts `--json`. Event timestam
 
 ```bash
 agenda status --json
-agenda calendars --json
-agenda upcoming --days 3 --limit 10 --json
+agenda calendar list --json
+agenda event list --days 3 --limit 10 --json
 ```
 
 ## Development

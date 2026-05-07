@@ -16,13 +16,13 @@ setup() {
   [ "$(sed -n '3p' "$AGENDA_FAKE_SWIFT_LOG")" = "--json" ]
 }
 
-@test "upcoming task forwards flags" {
-  run agenda_task upcoming --days 2 --limit 3 --json
+@test "event list task forwards flags" {
+  run agenda_task event:list --days 2 --limit 3 --json
 
   [ "$status" -eq 0 ]
   diff -u <(cat <<EXPECTED
 $REPO_DIR/lib/agenda.swift
-upcoming
+event/list
 --days
 2
 --limit
