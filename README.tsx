@@ -35,6 +35,7 @@ const readme = (
       <Badges>
         <Badge label="runtime" value="Swift + EventKit" color="f05138" logo="swift" logoColor="white" />
         <Badge label="shell" value="mise" color="7c3aed" href="https://mise.jdx.dev" />
+        <Badge label="output" value="gum" color="ff69b4" href="https://github.com/charmbracelet/gum" />
         <Badge label="platform" value="macOS" color="blue" />
         <Badge label="tests" value={`${testCount} passing`} color="brightgreen" />
       </Badges>
@@ -80,6 +81,13 @@ agenda request-access
 
 # Requires read access already granted
 agenda upcoming --days 7`}</CodeBlock>
+    </Section>
+
+    <Section title="Output">
+      <Paragraph>
+        Human-readable output uses <Link href="https://github.com/charmbracelet/gum">gum</Link>{" "}
+        tables and styled headings. Machine-readable output stays plain JSON.
+      </Paragraph>
     </Section>
 
     <Section title="JSON for agents">

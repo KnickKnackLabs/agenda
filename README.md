@@ -8,6 +8,7 @@ EventKit access for agents and humans: permission status, explicit access reques
 
 ![runtime: Swift + EventKit](https://img.shields.io/badge/runtime-Swift%20%2B%20EventKit-f05138?style=flat&logo=swift&logoColor=white)
 [![shell: mise](https://img.shields.io/badge/shell-mise-7c3aed?style=flat)](https://mise.jdx.dev)
+[![output: gum](https://img.shields.io/badge/output-gum-ff69b4?style=flat)](https://github.com/charmbracelet/gum)
 ![platform: macOS](https://img.shields.io/badge/platform-macOS-blue?style=flat)
 ![tests: 3 passing](https://img.shields.io/badge/tests-3%20passing-brightgreen?style=flat)
 
@@ -47,6 +48,10 @@ agenda request-access
 # Requires read access already granted
 agenda upcoming --days 7
 ```
+
+## Output
+
+Human-readable output uses [gum](https://github.com/charmbracelet/gum) tables and styled headings. Machine-readable output stays plain JSON.
 
 ## JSON for agents
 

@@ -16,10 +16,10 @@ struct Options {
 do {
     try run(Array(CommandLine.arguments.dropFirst()))
 } catch let error as AgendaError {
-    writeError("agenda: \(error.description)\n")
+    writeStyledError("agenda: \(error.description)")
     exit(1)
 } catch {
-    writeError("agenda: \(error)\n")
+    writeStyledError("agenda: \(error)")
     exit(1)
 }
 
@@ -134,11 +134,15 @@ func printStatus(json: Bool) throws {
     if json {
         try printJSON(payload)
     } else {
-        print("Calendar access: \(payload["status"] as! String)")
-        print("Can read events: \((payload["canRead"] as! Bool) ? "yes" : "no")")
+        var rows = [
+            ["Status", payload["status"] as! String],
+            ["Can read events", (payload["canRead"] as! Bool) ? "yes" : "no"],
+        ]
         if payload["needsPrompt"] as! Bool {
-            print("Next: run 'agenda request-access'")
+            rows.append(["Next", "run 'agenda request-access'"])
         }
+        printHeading("Calendar access")
+        printTable(headers: ["KEY", "VALUE"], rows: rows)
     }
 }
 
@@ -165,13 +169,21 @@ func requestAccess(json: Bool) throws {
 
     if json {
         try printJSON(payload)
-    } else if canReadEvents(after) {
-        print("Calendar access granted: \(statusName(after))")
-    } else if after == .denied || after == .restricted {
-        print("Calendar access denied: \(statusName(after))")
-        print("Next: enable Calendar access for this terminal app in System Settings → Privacy & Security → Calendars.")
     } else {
-        print("Calendar access not granted: \(statusName(after))")
+        var rows = [
+            ["Before", statusName(before)],
+            ["After", statusName(after)],
+            ["Granted", granted ? "yes" : "no"],
+            ["Can read events", canReadEvents(after) ? "yes" : "no"],
+        ]
+        if after == .denied || after == .restricted {
+            rows.append([
+                "Next",
+                "enable Calendar access for this terminal app in System Settings → Privacy & Security → Calendars",
+            ])
+        }
+        printHeading(canReadEvents(after) ? "Calendar access granted" : "Calendar access not granted")
+        printTable(headers: ["KEY", "VALUE"], rows: rows)
     }
 }
 
@@ -212,10 +224,13 @@ func listCalendars(json: Bool) throws {
         return
     }
 
-    print("ID\tTITLE\tSOURCE\tTYPE\tWRITABLE")
-    for row in rows {
-        print("\(row["id"]!)\t\(row["title"]!)\t\(row["source"]!)\t\(row["type"]!)\t\(row["writable"]!)")
-    }
+    printHeading("Calendars")
+    printTable(
+        headers: ["ID", "TITLE", "SOURCE", "TYPE", "WRITABLE"],
+        rows: rows.map { row in
+            [row["id"]!, row["title"]!, row["source"]!, row["type"]!, row["writable"]!]
+        }
+    )
 }
 
 func listUpcoming(options: Options) throws {
@@ -249,10 +264,13 @@ func listUpcoming(options: Options) throws {
         return
     }
 
-    print("START\tEND\tTITLE\tCALENDAR")
-    for row in events {
-        print("\(row["start"]!)\t\(row["end"]!)\t\(row["title"]!)\t\(row["calendar"]!)")
-    }
+    printHeading("Upcoming events")
+    printTable(
+        headers: ["START", "END", "TITLE", "CALENDAR"],
+        rows: events.map { row in
+            [row["start"]!, row["end"]!, row["title"]!, row["calendar"]!]
+        }
+    )
 }
 
 func requireReadAccess() throws {
@@ -341,6 +359,77 @@ func printJSON(_ value: Any) throws {
         throw AgendaError(description: "failed to encode JSON")
     }
     print(string)
+}
+
+func printHeading(_ text: String) {
+    if !runGum(["style", "--bold", text]) {
+        print(text)
+    }
+}
+
+func printTable(headers: [String], rows: [[String]]) {
+    let input = ([headers] + rows)
+        .map { row in row.map(sanitizeTableCell).joined(separator: "|") }
+        .joined(separator: "\n") + "\n"
+
+    if !runGum(["table", "-s", "|", "-p", "--border.foreground=240"], input: input) {
+        print(headers.joined(separator: "\t"))
+        for row in rows {
+            print(row.map(sanitizeTableCell).joined(separator: "\t"))
+        }
+    }
+}
+
+func sanitizeTableCell(_ value: String) -> String {
+    value
+        .replacingOccurrences(of: "|", with: " ")
+        .replacingOccurrences(of: "\r", with: " ")
+        .replacingOccurrences(of: "\n", with: " ")
+}
+
+func writeStyledError(_ text: String) {
+    let message = text.trimmingCharacters(in: .newlines)
+    if !runGum(["style", "--foreground", "196", "--bold", message], output: .standardError) {
+        writeError(message + "\n")
+    }
+}
+
+@discardableResult
+func runGum(_ args: [String], input: String? = nil, output: FileHandle = .standardOutput) -> Bool {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    let gum = ProcessInfo.processInfo.environment["GUM"] ?? "gum"
+    process.arguments = [gum] + args
+
+    let stdout = Pipe()
+    let stderr = Pipe()
+    let stdin = Pipe()
+    process.standardOutput = stdout
+    process.standardError = stderr
+    if input != nil {
+        process.standardInput = stdin
+    }
+
+    do {
+        try process.run()
+    } catch {
+        return false
+    }
+
+    if let input = input {
+        stdin.fileHandleForWriting.write(Data(input.utf8))
+        try? stdin.fileHandleForWriting.close()
+    }
+
+    let data = stdout.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+
+    guard process.terminationStatus == 0 else {
+        return false
+    }
+
+    output.write(data)
+    return true
 }
 
 func writeError(_ text: String) {
