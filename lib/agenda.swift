@@ -19,6 +19,7 @@ struct Options {
     var duration = 30
     var location: String?
     var notes: String?
+    var id: String?
 }
 
 do {
@@ -74,6 +75,15 @@ func run(_ args: [String]) throws {
             allowNotes: true
         )
         try createEvent(options: options)
+    case "event/delete":
+        let options = try parseOptions(
+            rest,
+            allowDays: false,
+            allowLimit: false,
+            allowCalendar: false,
+            allowId: true
+        )
+        try deleteEvent(options: options)
     default:
         throw AgendaError(description: "unknown command '\(command)'\nRun 'agenda --help' for usage.")
     }
@@ -91,7 +101,8 @@ func parseOptions(
     allowEnd: Bool = false,
     allowDuration: Bool = false,
     allowLocation: Bool = false,
-    allowNotes: Bool = false
+    allowNotes: Bool = false,
+    allowId: Bool = false
 ) throws -> Options {
     var options = Options()
     var index = 0
@@ -173,6 +184,10 @@ func parseOptions(
             guard allowNotes else { throw AgendaError(description: "--notes is not valid for this command") }
             options.notes = try requireValue(after: arg)
             index += 1
+        case "--id":
+            guard allowId else { throw AgendaError(description: "--id is not valid for this command") }
+            options.id = try requireValue(after: arg)
+            index += 1
         default:
             if arg.hasPrefix("-") {
                 throw AgendaError(description: "unknown flag '\(arg)'")
@@ -196,6 +211,7 @@ func printUsage() {
       agenda calendar create --name NAME [--source SOURCE] [--json]
       agenda event list [--days N] [--limit N] [--calendar NAME_OR_ID] [--json]
       agenda event create --calendar CAL --title TITLE --start START [--end END] [--duration MIN] [--json]
+      agenda event delete --id ID [--json]
 
     Commands:
       status           Show Calendar permission status without prompting
@@ -204,6 +220,7 @@ func printUsage() {
       calendar create  Create a calendar if it does not already exist
       event list       List upcoming events
       event create     Create an event on a writable calendar
+      event delete     Delete an event by identifier
 
     Notes:
       Only request-access triggers the macOS permission prompt.
@@ -399,6 +416,31 @@ func createEvent(options: Options) throws {
     }
 }
 
+func deleteEvent(options: Options) throws {
+    try requireWriteAccess()
+
+    guard let id = options.id else {
+        throw AgendaError(description: "--id is required")
+    }
+
+    let store = EKEventStore()
+    guard let event = store.event(withIdentifier: id) else {
+        throw AgendaError(description: "no event matched id '\(id)'")
+    }
+
+    let payload = eventPayload(event)
+    try store.remove(event, span: .thisEvent, commit: true)
+
+    var deletedPayload = payload
+    deletedPayload["deleted"] = "true"
+
+    if options.json {
+        try printJSON(deletedPayload)
+    } else {
+        printTable(headers: ["KEY", "VALUE"], rows: eventDeleteRows(deletedPayload))
+    }
+}
+
 func listUpcoming(options: Options) throws {
     try requireReadAccess()
 
@@ -538,6 +580,17 @@ func calendarCreateRows(_ payload: [String: String]) -> [[String]] {
 
 func eventCreateRows(_ payload: [String: String]) -> [[String]] {
     [
+        ["Title", payload["title"] ?? ""],
+        ["Start", payload["start"] ?? ""],
+        ["End", payload["end"] ?? ""],
+        ["Calendar", payload["calendar"] ?? ""],
+        ["ID", payload["id"] ?? ""],
+    ]
+}
+
+func eventDeleteRows(_ payload: [String: String]) -> [[String]] {
+    [
+        ["Deleted", payload["deleted"] ?? "false"],
         ["Title", payload["title"] ?? ""],
         ["Start", payload["start"] ?? ""],
         ["End", payload["end"] ?? ""],

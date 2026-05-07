@@ -50,6 +50,20 @@ EXPECTED
 ) "$AGENDA_FAKE_SWIFT_LOG"
 }
 
+@test "event delete task forwards id" {
+  run agenda event:delete --id event-123 --json
+
+  [ "$status" -eq 0 ]
+  diff -u <(cat <<EXPECTED
+$REPO_DIR/lib/agenda.swift
+event/delete
+--id
+event-123
+--json
+EXPECTED
+) "$AGENDA_FAKE_SWIFT_LOG"
+}
+
 @test "event list task forwards flags" {
   run agenda event:list --days 2 --limit 3 --json
 

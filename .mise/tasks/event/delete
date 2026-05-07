@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#MISE description="Delete an event by identifier"
+#USAGE flag "--id <id>" required=#true help="Event identifier"
+#USAGE flag "--json" help="Output JSON"
+set -euo pipefail
+
+exec "${SWIFT:-swift}" "$MISE_CONFIG_ROOT/lib/agenda.swift" "event/delete" "$@"
