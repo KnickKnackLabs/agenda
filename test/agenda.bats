@@ -8,7 +8,7 @@ setup() {
 }
 
 @test "status task forwards to Swift command" {
-  run agenda_task status --json
+  run agenda status --json
 
   [ "$status" -eq 0 ]
   [ "$(sed -n '1p' "$AGENDA_FAKE_SWIFT_LOG")" = "$REPO_DIR/lib/agenda.swift" ]
@@ -16,8 +16,22 @@ setup() {
   [ "$(sed -n '3p' "$AGENDA_FAKE_SWIFT_LOG")" = "--json" ]
 }
 
+@test "calendar create task forwards name" {
+  run agenda calendar:create --name agent/k7r2 --json
+
+  [ "$status" -eq 0 ]
+  diff -u <(cat <<EXPECTED
+$REPO_DIR/lib/agenda.swift
+calendar/create
+--name
+agent/k7r2
+--json
+EXPECTED
+) "$AGENDA_FAKE_SWIFT_LOG"
+}
+
 @test "event list task forwards flags" {
-  run agenda_task event:list --days 2 --limit 3 --json
+  run agenda event:list --days 2 --limit 3 --json
 
   [ "$status" -eq 0 ]
   diff -u <(cat <<EXPECTED

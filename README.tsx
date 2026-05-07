@@ -51,6 +51,7 @@ const readme = (
       <CodeBlock lang="bash">{`agenda status
 agenda request-access
 agenda calendar list
+agenda calendar create --name agent/k7r2
 agenda calendar list --json
 agenda event list --days 14 --limit 20
 agenda event list --calendar Work --json`}</CodeBlock>
@@ -61,6 +62,7 @@ agenda event list --calendar Work --json`}</CodeBlock>
         <Item><Code>status</Code> — show Calendar authorization state without prompting.</Item>
         <Item><Code>request-access</Code> — ask macOS for full EventKit calendar access.</Item>
         <Item><Code>calendar list</Code> — list readable calendars, sources, types, and writability.</Item>
+        <Item><Code>calendar create</Code> — create a writable calendar if it does not already exist.</Item>
         <Item><Code>event list</Code> — list events from now through a configurable day window.</Item>
       </List>
     </Section>
@@ -98,6 +100,7 @@ agenda event list --days 7`}</CodeBlock>
 
       <CodeBlock lang="bash">{`agenda status --json
 agenda calendar list --json
+agenda calendar create --name agent/k7r2 --json
 agenda event list --days 3 --limit 10 --json`}</CodeBlock>
     </Section>
 

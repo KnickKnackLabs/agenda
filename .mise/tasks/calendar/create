@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Create a calendar if it does not already exist"
+#USAGE flag "--name <name>" required=#true help="Calendar title to create"
+#USAGE flag "--source <source>" help="Source title or identifier (default: default event source)"
+#USAGE flag "--json" help="Output JSON"
+set -euo pipefail
+
+exec "${SWIFT:-swift}" "$MISE_CONFIG_ROOT/lib/agenda.swift" "calendar/create" "$@"

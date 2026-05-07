@@ -11,6 +11,8 @@ struct Options {
     var days = 7
     var limit = 10
     var calendar: String?
+    var name: String?
+    var source: String?
 }
 
 do {
@@ -39,6 +41,16 @@ func run(_ args: [String]) throws {
     case "calendar/list":
         let options = try parseOptions(rest, allowDays: false, allowLimit: false, allowCalendar: false)
         try listCalendars(json: options.json)
+    case "calendar/create":
+        let options = try parseOptions(
+            rest,
+            allowDays: false,
+            allowLimit: false,
+            allowCalendar: false,
+            allowName: true,
+            allowSource: true
+        )
+        try createCalendar(options: options)
     case "event/list":
         let options = try parseOptions(rest, allowDays: true, allowLimit: true, allowCalendar: true)
         try listUpcoming(options: options)
@@ -51,7 +63,9 @@ func parseOptions(
     _ args: [String],
     allowDays: Bool,
     allowLimit: Bool,
-    allowCalendar: Bool
+    allowCalendar: Bool,
+    allowName: Bool = false,
+    allowSource: Bool = false
 ) throws -> Options {
     var options = Options()
     var index = 0
@@ -89,6 +103,18 @@ func parseOptions(
             guard allowCalendar else { throw AgendaError(description: "--calendar is not valid for this command") }
             options.calendar = try requireValue(after: arg)
             index += 1
+        case "--name":
+            guard allowName else { throw AgendaError(description: "--name is not valid for this command") }
+            let value = try requireValue(after: arg)
+            guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw AgendaError(description: "--name must not be empty")
+            }
+            options.name = value
+            index += 1
+        case "--source":
+            guard allowSource else { throw AgendaError(description: "--source is not valid for this command") }
+            options.source = try requireValue(after: arg)
+            index += 1
         default:
             if arg.hasPrefix("-") {
                 throw AgendaError(description: "unknown flag '\(arg)'")
@@ -109,13 +135,15 @@ func printUsage() {
       agenda status [--json]
       agenda request-access [--json]
       agenda calendar list [--json]
+      agenda calendar create --name NAME [--source SOURCE] [--json]
       agenda event list [--days N] [--limit N] [--calendar NAME_OR_ID] [--json]
 
     Commands:
-      status          Show Calendar permission status without prompting
-      request-access  Ask macOS for Calendar read access
-      calendar list   List readable calendars
-      event list      List upcoming events
+      status           Show Calendar permission status without prompting
+      request-access   Ask macOS for Calendar read access
+      calendar list    List readable calendars
+      calendar create  Create a calendar if it does not already exist
+      event list       List upcoming events
 
     Notes:
       Only request-access triggers the macOS permission prompt.
@@ -141,7 +169,6 @@ func printStatus(json: Bool) throws {
         if payload["needsPrompt"] as! Bool {
             rows.append(["Next", "run 'agenda request-access'"])
         }
-        printHeading("Calendar access")
         printTable(headers: ["KEY", "VALUE"], rows: rows)
     }
 }
@@ -182,7 +209,6 @@ func requestAccess(json: Bool) throws {
                 "enable Calendar access for this terminal app in System Settings → Privacy & Security → Calendars",
             ])
         }
-        printHeading(canReadEvents(after) ? "Calendar access granted" : "Calendar access not granted")
         printTable(headers: ["KEY", "VALUE"], rows: rows)
     }
 }
@@ -218,19 +244,51 @@ func listCalendars(json: Bool) throws {
         left.title.localizedCaseInsensitiveCompare(right.title) == .orderedAscending
     }
 
-    let rows = calendars.map(calendarPayload)
+    let rows = calendars.map { calendarPayload($0) }
     if json {
         try printJSON(rows)
         return
     }
 
-    printHeading("Calendars")
     printTable(
         headers: ["ID", "TITLE", "SOURCE", "TYPE", "WRITABLE"],
         rows: rows.map { row in
             [row["id"]!, row["title"]!, row["source"]!, row["type"]!, row["writable"]!]
         }
     )
+}
+
+func createCalendar(options: Options) throws {
+    try requireWriteAccess()
+
+    guard let name = options.name else {
+        throw AgendaError(description: "--name is required")
+    }
+
+    let store = EKEventStore()
+    if let existing = store.calendars(for: .event).first(where: { $0.title == name }) {
+        let payload = calendarPayload(existing, created: false)
+        if options.json {
+            try printJSON(payload)
+        } else {
+            printTable(headers: ["KEY", "VALUE"], rows: calendarCreateRows(payload))
+        }
+        return
+    }
+
+    let source = try selectSource(store: store, requested: options.source)
+    let calendar = EKCalendar(for: .event, eventStore: store)
+    calendar.title = name
+    calendar.source = source
+
+    try store.saveCalendar(calendar, commit: true)
+
+    let payload = calendarPayload(calendar, created: true)
+    if options.json {
+        try printJSON(payload)
+    } else {
+        printTable(headers: ["KEY", "VALUE"], rows: calendarCreateRows(payload))
+    }
 }
 
 func listUpcoming(options: Options) throws {
@@ -264,13 +322,21 @@ func listUpcoming(options: Options) throws {
         return
     }
 
-    printHeading("Upcoming events")
     printTable(
         headers: ["START", "END", "TITLE", "CALENDAR"],
         rows: events.map { row in
             [row["start"]!, row["end"]!, row["title"]!, row["calendar"]!]
         }
     )
+}
+
+func requireWriteAccess() throws {
+    let status = EKEventStore.authorizationStatus(for: .event)
+    if !canWriteEvents(status) {
+        throw AgendaError(
+            description: "Calendar write access is \(statusName(status)). Run 'agenda request-access' first."
+        )
+    }
 }
 
 func requireReadAccess() throws {
@@ -303,13 +369,58 @@ func canReadEvents(_ status: EKAuthorizationStatus) -> Bool {
     }
 }
 
-func calendarPayload(_ calendar: EKCalendar) -> [String: String] {
-    [
+func canWriteEvents(_ status: EKAuthorizationStatus) -> Bool {
+    switch status {
+    case .authorized, .fullAccess, .writeOnly:
+        return true
+    default:
+        return false
+    }
+}
+
+func selectSource(store: EKEventStore, requested: String?) throws -> EKSource {
+    if let requested = requested {
+        if let source = store.sources.first(where: { $0.sourceIdentifier == requested || $0.title == requested }) {
+            return source
+        }
+        throw AgendaError(description: "no source matched '\(requested)'")
+    }
+
+    if let source = store.defaultCalendarForNewEvents?.source {
+        return source
+    }
+
+    if let source = store.sources.first(where: { $0.sourceType == .calDAV || $0.sourceType == .local }) {
+        return source
+    }
+
+    guard let source = store.sources.first else {
+        throw AgendaError(description: "no Calendar sources available")
+    }
+    return source
+}
+
+func calendarPayload(_ calendar: EKCalendar, created: Bool? = nil) -> [String: String] {
+    var payload = [
         "id": calendar.calendarIdentifier,
         "title": calendar.title,
         "source": calendar.source.title,
         "type": calendarTypeName(calendar.type),
         "writable": calendar.allowsContentModifications ? "true" : "false",
+    ]
+    if let created = created {
+        payload["created"] = created ? "true" : "false"
+    }
+    return payload
+}
+
+func calendarCreateRows(_ payload: [String: String]) -> [[String]] {
+    [
+        ["Created", payload["created"] ?? "false"],
+        ["Title", payload["title"] ?? ""],
+        ["ID", payload["id"] ?? ""],
+        ["Source", payload["source"] ?? ""],
+        ["Writable", payload["writable"] ?? ""],
     ]
 }
 
@@ -359,12 +470,6 @@ func printJSON(_ value: Any) throws {
         throw AgendaError(description: "failed to encode JSON")
     }
     print(string)
-}
-
-func printHeading(_ text: String) {
-    if !runGum(["style", "--bold", text]) {
-        print(text)
-    }
 }
 
 func printTable(headers: [String], rows: [[String]]) {

@@ -10,7 +10,7 @@ EventKit access for agents and humans: permission status, explicit access reques
 [![shell: mise](https://img.shields.io/badge/shell-mise-7c3aed?style=flat)](https://mise.jdx.dev)
 [![output: gum](https://img.shields.io/badge/output-gum-ff69b4?style=flat)](https://github.com/charmbracelet/gum)
 ![platform: macOS](https://img.shields.io/badge/platform-macOS-blue?style=flat)
-![tests: 3 passing](https://img.shields.io/badge/tests-3%20passing-brightgreen?style=flat)
+![tests: 4 passing](https://img.shields.io/badge/tests-4%20passing-brightgreen?style=flat)
 
 </div>
 
@@ -22,6 +22,7 @@ The read commands do not trigger the macOS permission prompt. Use `agenda reques
 agenda status
 agenda request-access
 agenda calendar list
+agenda calendar create --name agent/k7r2
 agenda calendar list --json
 agenda event list --days 14 --limit 20
 agenda event list --calendar Work --json
@@ -32,6 +33,7 @@ agenda event list --calendar Work --json
 - `status` — show Calendar authorization state without prompting.
 - `request-access` — ask macOS for full EventKit calendar access.
 - `calendar list` — list readable calendars, sources, types, and writability.
+- `calendar create` — create a writable calendar if it does not already exist.
 - `event list` — list events from now through a configurable day window.
 
 ## Permission model
@@ -60,6 +62,7 @@ Every read surface that returns structured data accepts `--json`. Event timestam
 ```bash
 agenda status --json
 agenda calendar list --json
+agenda calendar create --name agent/k7r2 --json
 agenda event list --days 3 --limit 10 --json
 ```
 
@@ -73,7 +76,7 @@ mise run test
 readme build --check
 ```
 
-Tests use [BATS](https://github.com/bats-core/bats-core) — 3 tests across 1 suite. CI runs on macOS so the Swift source can typecheck against EventKit.
+Tests use [BATS](https://github.com/bats-core/bats-core) — 4 tests across 1 suite. CI runs on macOS so the Swift source can typecheck against EventKit.
 
 <div align="center">
 
