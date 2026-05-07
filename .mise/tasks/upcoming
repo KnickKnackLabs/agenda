@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+#MISE description="List upcoming events"
+#USAGE flag "--days <days>" help="Number of days to look ahead (default: 7)"
+#USAGE flag "--limit <limit>" help="Maximum events to return (default: 10)"
+#USAGE flag "--calendar <calendar>" help="Calendar title or identifier to filter"
+#USAGE flag "--json" help="Output JSON"
+set -euo pipefail
+
+exec "${SWIFT:-swift}" "$MISE_CONFIG_ROOT/lib/agenda.swift" "upcoming" "$@"

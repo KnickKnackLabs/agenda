@@ -9,7 +9,7 @@ EventKit access for agents and humans: permission status, explicit access reques
 ![runtime: Swift + EventKit](https://img.shields.io/badge/runtime-Swift%20%2B%20EventKit-f05138?style=flat&logo=swift&logoColor=white)
 [![shell: mise](https://img.shields.io/badge/shell-mise-7c3aed?style=flat)](https://mise.jdx.dev)
 ![platform: macOS](https://img.shields.io/badge/platform-macOS-blue?style=flat)
-![tests: 3 passing](https://img.shields.io/badge/tests-3%20passing-brightgreen?style=flat)
+![tests: 5 passing](https://img.shields.io/badge/tests-5%20passing-brightgreen?style=flat)
 
 </div>
 
@@ -68,7 +68,7 @@ mise run test
 readme build --check
 ```
 
-Tests use [BATS](https://github.com/bats-core/bats-core) — 3 tests across 1 suite. CI runs on macOS so the Swift source can typecheck against EventKit.
+Tests use [BATS](https://github.com/bats-core/bats-core) — 5 tests across 1 suite. CI runs on macOS so the Swift source can typecheck against EventKit.
 
 <div align="center">
 

@@ -34,6 +34,31 @@ EXPECTED
 ) "$AGENDA_FAKE_SWIFT_LOG"
 }
 
+@test "first-class status task forwards to Swift command" {
+  run agenda_task status --json
+
+  [ "$status" -eq 0 ]
+  [ "$(sed -n '1p' "$AGENDA_FAKE_SWIFT_LOG")" = "$REPO_DIR/lib/agenda.swift" ]
+  [ "$(sed -n '2p' "$AGENDA_FAKE_SWIFT_LOG")" = "status" ]
+  [ "$(sed -n '3p' "$AGENDA_FAKE_SWIFT_LOG")" = "--json" ]
+}
+
+@test "first-class upcoming task forwards flags" {
+  run agenda_task upcoming --days 2 --limit 3 --json
+
+  [ "$status" -eq 0 ]
+  diff -u <(cat <<EXPECTED
+$REPO_DIR/lib/agenda.swift
+upcoming
+--days
+2
+--limit
+3
+--json
+EXPECTED
+) "$AGENDA_FAKE_SWIFT_LOG"
+}
+
 @test "Swift source typechecks on macOS" {
   if [ "$(uname -s)" != "Darwin" ]; then
     skip "EventKit is only available on macOS"

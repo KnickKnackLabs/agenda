@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Ask macOS for Calendar read access"
+#USAGE flag "--json" help="Output JSON"
+set -euo pipefail
+
+exec "${SWIFT:-swift}" "$MISE_CONFIG_ROOT/lib/agenda.swift" "request-access" "$@"

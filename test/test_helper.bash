@@ -20,12 +20,21 @@ FAKE
   chmod +x "$FAKE_SWIFT"
 }
 
-agenda() {
+ensure_caller_pwd() {
   if [ -z "${CALLER_PWD:-}" ]; then
     export CALLER_PWD="$BATS_TEST_TMPDIR/caller"
     mkdir -p "$CALLER_PWD"
   fi
+}
 
+agenda() {
+  ensure_caller_pwd
   cd "$REPO_DIR" && SWIFT="${FAKE_SWIFT:-swift}" CALLER_PWD="$CALLER_PWD" mise run -q agenda "$@"
 }
 export -f agenda
+
+agenda_task() {
+  ensure_caller_pwd
+  cd "$REPO_DIR" && SWIFT="${FAKE_SWIFT:-swift}" CALLER_PWD="$CALLER_PWD" mise run -q "$@"
+}
+export -f agenda_task
