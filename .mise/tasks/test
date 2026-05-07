@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+#MISE description="Run BATS tests"
+#USAGE arg "[args]..." var=#true help="Test suites or bats arguments"
+#USAGE example "mise run test" header="Run all tests"
+#USAGE example "mise run test agenda" header="Run the agenda suite"
+#USAGE example "mise run test -- --filter typecheck" header="Filter tests by name"
+set -euo pipefail
+
+TEST_DIR="$MISE_CONFIG_ROOT/test"
+
+args=()
+has_target=false
+
+for arg in "$@"; do
+  if [[ "$arg" != -* && "$arg" != *.bats && -f "$TEST_DIR/$arg.bats" ]]; then
+    args+=("$TEST_DIR/$arg.bats")
+    has_target=true
+  else
+    if [[ "$arg" == *.bats || -d "$arg" ]]; then
+      has_target=true
+    fi
+    args+=("$arg")
+  fi
+done
+
+if [ "$has_target" != "true" ]; then
+  args+=("$TEST_DIR/")
+fi
+
+bats "${args[@]}"
