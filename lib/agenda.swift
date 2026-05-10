@@ -84,6 +84,9 @@ func run(_ args: [String]) throws {
             allowId: true
         )
         try deleteEvent(options: options)
+    case "event/prompt":
+        let options = try parseOptions(rest, allowDays: false, allowLimit: false, allowCalendar: false)
+        try promptEvent(options: options)
     default:
         throw AgendaError(description: "unknown command '\(command)'\nRun 'agenda --help' for usage.")
     }
@@ -211,6 +214,7 @@ func printUsage() {
       agenda calendar create --name NAME [--source SOURCE] [--json]
       agenda event list [--days N] [--limit N] [--calendar NAME_OR_ID] [--json]
       agenda event create --calendar CAL --title TITLE --start START [--end END] [--duration MIN] [--json]
+      agenda event prompt [--json]
       agenda event delete --id ID [--json]
 
     Commands:
@@ -220,6 +224,7 @@ func printUsage() {
       calendar create  Create a calendar if it does not already exist
       event list       List upcoming events
       event create     Create an event on a writable calendar
+      event prompt     Create an event interactively via gum prompts
       event delete     Delete an event by identifier
 
     Notes:
@@ -414,6 +419,75 @@ func createEvent(options: Options) throws {
     } else {
         printTable(headers: ["KEY", "VALUE"], rows: eventCreateRows(payload))
     }
+}
+
+func promptEvent(options: Options) throws {
+    try requireWriteAccess()
+
+    let store = EKEventStore()
+    let writable = store.calendars(for: .event)
+        .filter { $0.allowsContentModifications }
+        .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+
+    guard !writable.isEmpty else {
+        throw AgendaError(
+            description: "no writable calendars available. Run 'agenda calendar create --name NAME' first."
+        )
+    }
+
+    let chosenTitle = try gumChoose(writable.map { $0.title }, header: "Calendar")
+
+    let title = try gumInput(prompt: "Title")
+    guard !title.isEmpty else {
+        throw AgendaError(description: "title is required")
+    }
+
+    let startText = try gumInput(prompt: "Start", placeholder: "2026-05-08 14:00")
+    guard !startText.isEmpty else {
+        throw AgendaError(description: "start is required")
+    }
+    _ = try parseDate(startText)
+
+    let durationRaw = try gumInput(prompt: "Duration (minutes)", value: "30")
+    let durationTrimmed = durationRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+    let durationMinutes: Int
+    if durationTrimmed.isEmpty {
+        durationMinutes = 30
+    } else if let n = Int(durationTrimmed), n > 0 {
+        durationMinutes = n
+    } else {
+        throw AgendaError(description: "duration must be a positive number of minutes")
+    }
+
+    let endText = try gumInput(prompt: "End (optional, overrides duration)")
+    let endValue: String? = endText.isEmpty ? nil : endText
+
+    let locationText = try gumInput(prompt: "Location (optional)")
+    let locationValue: String? = locationText.isEmpty ? nil : locationText
+
+    let notesText = try gumWrite(prompt: "Notes (optional, ctrl-d to finish)")
+    let notesValue: String? = notesText.isEmpty ? nil : notesText
+
+    let summary = "\(title) on \(chosenTitle) at \(startText)"
+    if !gumConfirm("Create '\(summary)'?") {
+        if options.json {
+            try printJSON(["cancelled": true])
+        } else {
+            print("cancelled")
+        }
+        return
+    }
+
+    var built = options
+    built.calendar = chosenTitle
+    built.title = title
+    built.start = startText
+    built.end = endValue
+    built.duration = durationMinutes
+    built.location = locationValue
+    built.notes = notesValue
+
+    try createEvent(options: built)
 }
 
 func deleteEvent(options: Options) throws {
@@ -734,6 +808,119 @@ func runGum(_ args: [String], input: String? = nil, output: FileHandle = .standa
 
     output.write(data)
     return true
+}
+
+// Run gum with the controlling terminal properly handed off.
+// Solves two problems Swift's Process API has with interactive children:
+//   1. Stdin/stderr aren't reliably inherited (especially under swift -interpret),
+//      so we explicitly attach the child's stdin/stderr to /dev/tty.
+//   2. Foundation Process puts the child in a NEW process group, but the
+//      terminal's foreground process group is still ours. Any TTY read/write
+//      from the child triggers SIGTTIN/SIGTTOU and stops it. We transfer
+//      foreground control to the child's pgid for its lifetime, then restore.
+func spawnGumOnTerminal(args: [String], captureStdout: Bool) throws -> (exitCode: Int32, stdout: String) {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    let gum = ProcessInfo.processInfo.environment["GUM"] ?? "gum"
+    process.arguments = [gum] + args
+
+    let ttyURL = URL(fileURLWithPath: "/dev/tty")
+    do {
+        process.standardInput = try FileHandle(forReadingFrom: ttyURL)
+        process.standardError = try FileHandle(forWritingTo: ttyURL)
+    } catch {
+        throw AgendaError(
+            description: "could not open /dev/tty (interactive prompts require a terminal)"
+        )
+    }
+
+    var stdoutPipe: Pipe?
+    if captureStdout {
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        stdoutPipe = pipe
+    }
+
+    // Separate fd to /dev/tty for tcsetpgrp — the FileHandles passed to
+    // process get dup'd and closed by Foundation, so we can't reuse them.
+    let ttyFd = Darwin.open("/dev/tty", O_WRONLY)
+    guard ttyFd >= 0 else {
+        throw AgendaError(description: "could not open /dev/tty for foreground transfer")
+    }
+    defer { Darwin.close(ttyFd) }
+
+    // Ignore SIGTTOU while we change the foreground pgid; otherwise our own
+    // tcsetpgrp call could SIGTTOU us into a stop.
+    let oldSigttou = Darwin.signal(SIGTTOU, SIG_IGN)
+    defer { _ = Darwin.signal(SIGTTOU, oldSigttou) }
+
+    let savedFg = tcgetpgrp(ttyFd)
+
+    do {
+        try process.run()
+    } catch {
+        throw AgendaError(description: "could not run gum: \(error)")
+    }
+
+    // Foundation makes the child a process-group leader, so its pgid == its pid.
+    let childPid = process.processIdentifier
+    _ = tcsetpgrp(ttyFd, childPid)
+
+    var captured = Data()
+    if let stdoutPipe = stdoutPipe {
+        captured = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+    }
+    process.waitUntilExit()
+
+    // Always hand the terminal back to whoever owned it before us.
+    if savedFg > 0 {
+        _ = tcsetpgrp(ttyFd, savedFg)
+    }
+
+    let stdoutStr = (String(data: captured, encoding: .utf8) ?? "")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    return (process.terminationStatus, stdoutStr)
+}
+
+func runGumInteractive(_ args: [String]) throws -> String {
+    let result = try spawnGumOnTerminal(args: args, captureStdout: true)
+    guard result.exitCode == 0 else {
+        throw AgendaError(description: "cancelled")
+    }
+    return result.stdout
+}
+
+func gumChoose(_ items: [String], header: String? = nil) throws -> String {
+    var args = ["choose"]
+    if let header = header {
+        args += ["--header", header]
+    }
+    args += items
+    return try runGumInteractive(args)
+}
+
+func gumInput(prompt: String, placeholder: String? = nil, value: String? = nil) throws -> String {
+    var args = ["input", "--prompt", "\(prompt): "]
+    if let placeholder = placeholder {
+        args += ["--placeholder", placeholder]
+    }
+    if let value = value {
+        args += ["--value", value]
+    }
+    return try runGumInteractive(args)
+}
+
+func gumWrite(prompt: String) throws -> String {
+    return try runGumInteractive(["write", "--header", prompt])
+}
+
+func gumConfirm(_ message: String) -> Bool {
+    do {
+        let result = try spawnGumOnTerminal(args: ["confirm", message], captureStdout: false)
+        return result.exitCode == 0
+    } catch {
+        return false
+    }
 }
 
 func writeError(_ text: String) {

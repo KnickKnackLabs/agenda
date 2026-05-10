@@ -80,6 +80,18 @@ EXPECTED
 ) "$AGENDA_FAKE_SWIFT_LOG"
 }
 
+@test "event prompt task forwards to Swift command" {
+  run agenda event:prompt --json
+
+  [ "$status" -eq 0 ]
+  diff -u <(cat <<EXPECTED
+$REPO_DIR/lib/agenda.swift
+event/prompt
+--json
+EXPECTED
+) "$AGENDA_FAKE_SWIFT_LOG"
+}
+
 @test "Swift source typechecks on macOS" {
   if [ "$(uname -s)" != "Darwin" ]; then
     skip "EventKit is only available on macOS"
