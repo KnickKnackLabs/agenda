@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Create an event interactively via gum prompts"
+#USAGE flag "--json" help="Output JSON for the created event"
+set -euo pipefail
+
+exec "${SWIFT:-swift}" "$MISE_CONFIG_ROOT/lib/agenda.swift" "event/prompt" "$@"

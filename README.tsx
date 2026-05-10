@@ -55,6 +55,7 @@ agenda calendar create --name agent/k7r2
 agenda calendar list --json
 agenda event list --days 14 --limit 20
 agenda event create --calendar agent/k7r2 --title "Agenda follow-up" --start "2026-05-08 10:00"
+agenda event prompt
 agenda event delete --id EVENT_ID
 agenda event list --calendar agent/k7r2 --json`}</CodeBlock>
     </Section>
@@ -67,6 +68,7 @@ agenda event list --calendar agent/k7r2 --json`}</CodeBlock>
         <Item><Code>calendar create</Code> — create a writable calendar if it does not already exist.</Item>
         <Item><Code>event list</Code> — list events from now through a configurable day window.</Item>
         <Item><Code>event create</Code> — create an event on a writable calendar.</Item>
+        <Item><Code>event prompt</Code> — create an event interactively via gum prompts.</Item>
         <Item><Code>event delete</Code> — delete an event by identifier.</Item>
       </List>
     </Section>
